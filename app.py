@@ -18,6 +18,27 @@ if os.path.exists(DATA_FILE):
     df = pd.read_csv(DATA_FILE)
 else:
     df = pd.DataFrame(columns=columns)
+    # ---- MIGRATION / SAFETY: make old CSVs work with new code ----
+# If your CSV came from an older version, it may be missing columns.
+needed = ["Client", "Last Seen", "Intake Complete", "Treatment Plan Date"]
+
+# Add any missing columns
+for c in needed:
+    if c not in df.columns:
+        df[c] = ""
+
+# Sometimes booleans get saved as strings; normalize Intake Complete
+def to_bool(v):
+    if isinstance(v, bool):
+        return v
+    s = str(v).strip().lower()
+    return s in ["true", "1", "yes", "y"]
+
+df["Intake Complete"] = df["Intake Complete"].apply(to_bool)
+
+# Ensure date columns are strings (Streamlit/Pandas can mix types)
+for c in ["Last Seen", "Treatment Plan Date"]:
+    df[c] = df[c].astype(str).replace("nan", "")
 
 # -------- Add client --------
 st.header("Add Client")
