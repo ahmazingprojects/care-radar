@@ -1,11 +1,17 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime, timedelta
+import os
 
 st.title("Continuum of Care Radar")
 
-if "clients" not in st.session_state:
-    st.session_state.clients = []
+DATA_FILE = "clients.csv"
+
+# ---- Load saved data ----
+if os.path.exists(DATA_FILE):
+    df = pd.read_csv(DATA_FILE)
+else:
+    df = pd.DataFrame(columns=["Client", "30-Day Due"])
 
 # ---- Add client form ----
 st.header("Add Client")
@@ -17,15 +23,14 @@ with st.form("new_client"):
 
     if submitted and name:
         due_30 = last_seen + timedelta(days=30)
-
-        st.session_state.clients.append({
+        new_row = {
             "Client": name,
             "30-Day Due": due_30.strftime("%Y-%m-%d")
-        })
+        }
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+        df.to_csv(DATA_FILE, index=False)
 
-# ---- Build dataframe ----
-df = pd.DataFrame(st.session_state.clients)
-
+# ---- Status logic ----
 today = date.today()
 
 def status(d):
