@@ -5,7 +5,7 @@ import os
 
 st.title("Continuum of Care Radar")
 
-DATA_FILE = "clients.csv"
+
 
 columns = [
     "Client",
