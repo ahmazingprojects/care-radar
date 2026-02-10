@@ -13,7 +13,7 @@ columns = [
     "Intake Complete",
     "Treatment Plan Date",
 ]
-
+DATA_FILE = "clients.csv"
 if os.path.exists(DATA_FILE):
     df = pd.read_csv(DATA_FILE)
 else:
