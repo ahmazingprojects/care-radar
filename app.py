@@ -66,7 +66,21 @@ with st.form("new_client"):
 today = date.today()
 
 def days_since(d):
-    return (today - datetime.strptime(d, "%Y-%m-%d").date()).days
+    # Accept blank, YYYY-MM-DD, or YYYY/MM/DD
+    if d is None:
+        return 10**9
+    s = str(d).strip()
+    if s == "" or s.lower() == "nan":
+        return 10**9  # treat missing as very old / urgent
+
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
+        try:
+            return (today - datetime.strptime(s, fmt).date()).days
+        except ValueError:
+            pass
+
+    # If it's some other weird format, treat as missing
+    return 10**9
 
 def task_status(days, good, warn):
     if days > warn:
