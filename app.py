@@ -134,8 +134,9 @@ if not df.empty:
     )
 
     st.header("Continuum Checklist")
-    for _, row in view.iterrows():
-        with st.expander(f"{row['Client']} — {row['Overall']} — {row['Next Action']}"):
+
+for _, row in view.iterrows():
+    with st.expander(f"{row['Client']} — {row['Overall']} — {row['Next Action']}"):
         st.write(f"Intake: {row['Intake Status']}")
         st.write(f"Last seen: {row['Last Seen Status']} ({int(row['Days Since Seen'])} days)")
         st.write(f"Treatment plan: {row['Treatment Plan Status']} ({int(row['Days Since TP'])} days)")
