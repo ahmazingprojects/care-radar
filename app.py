@@ -4,7 +4,7 @@ OMNIVEIL — CLINICAL RADAR
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime, timedelta
-import os
+from supabase import create_client
 
 st.set_page_config(page_title="Omniveil — Caseload Manager", page_icon="🌿", layout="wide", initial_sidebar_state="collapsed")
 
@@ -15,14 +15,12 @@ st.markdown("""
 html, body, .stApp { background-color: #f7f6f3; color: #1a1a2e; font-family: 'DM Sans', sans-serif; }
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { padding: 2rem 2.5rem 3rem 2.5rem; max-width: 1300px; }
-
 .top-bar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 20px; margin-bottom: 28px; border-bottom: 1px solid #e8e5df; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-icon { width: 38px; height: 38px; background: #2d6a4f; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
 .brand-name { font-family: 'DM Serif Display', serif; font-size: 22px; color: #1a1a2e; letter-spacing: -0.5px; line-height: 1; }
 .brand-tagline { font-size: 11px; color: #8a8a9a; letter-spacing: 0.5px; margin-top: 2px; }
 .top-date { font-size: 13px; color: #8a8a9a; }
-
 .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
 .stat-card { background: white; border-radius: 14px; padding: 20px 22px; border: 1px solid #e8e5df; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; align-items: center; gap: 16px; }
 .stat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
@@ -30,120 +28,185 @@ html, body, .stApp { background-color: #f7f6f3; color: #1a1a2e; font-family: 'DM
 .stat-number { font-size: 32px; font-weight: 600; line-height: 1; letter-spacing: -1px; }
 .stat-card.teal-card .stat-number { color: #2d6a4f; } .stat-card.red-card .stat-number { color: #c0392b; } .stat-card.amber-card .stat-number { color: #d4880a; } .stat-card.blue-card .stat-number { color: #2563eb; }
 .stat-label { font-size: 12px; color: #8a8a9a; font-weight: 500; margin-top: 3px; }
-
 .section-head { font-size: 13px; font-weight: 600; color: #8a8a9a; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
-
 .table-head { display: grid; grid-template-columns: 36px 2.2fr 150px 90px 90px 90px 2fr 90px 44px; gap: 12px; padding: 0 16px 10px 16px; font-size: 11px; font-weight: 600; color: #a0a0b0; letter-spacing: 0.8px; text-transform: uppercase; border-bottom: 2px solid #e8e5df; margin-bottom: 6px; }
-
 .patient-row { background: white; border: 1px solid #e8e5df; border-radius: 12px; padding: 14px 16px; margin-bottom: 4px; display: grid; grid-template-columns: 36px 2.2fr 150px 90px 90px 90px 2fr 90px 44px; align-items: center; gap: 12px; transition: box-shadow 0.15s; }
 .patient-row:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); border-color: #d0cdc6; }
-.patient-row.flag-red   { border-left: 4px solid #e74c3c; }
-.patient-row.flag-amber { border-left: 4px solid #f39c12; }
-.patient-row.flag-teal  { border-left: 4px solid #2d6a4f; }
-.patient-row.flag-blue  { border-left: 4px solid #2563eb; }
-
+.patient-row.flag-red { border-left: 4px solid #e74c3c; } .patient-row.flag-amber { border-left: 4px solid #f39c12; } .patient-row.flag-teal { border-left: 4px solid #2d6a4f; } .patient-row.flag-blue { border-left: 4px solid #2563eb; }
 .rank-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
-.rank-num.critical { background: #fdecea; color: #c0392b; }
-.rank-num.warning  { background: #fef6e4; color: #d4880a; }
-.rank-num.normal   { background: #e8f4f0; color: #2d6a4f; }
-
-.client-name { font-size: 15px; font-weight: 600; color: #1a1a2e; }
-.client-sub  { font-size: 11px; color: #a0a0b0; margin-top: 2px; }
-
+.rank-num.critical { background: #fdecea; color: #c0392b; } .rank-num.warning { background: #fef6e4; color: #d4880a; } .rank-num.normal { background: #e8f4f0; color: #2d6a4f; }
+.client-name { font-size: 15px; font-weight: 600; color: #1a1a2e; } .client-sub { font-size: 11px; color: #a0a0b0; margin-top: 2px; }
 .pill { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
-.pill-red   { background: #fdecea; color: #c0392b; }
-.pill-amber { background: #fef6e4; color: #d4880a; }
-.pill-teal  { background: #e8f4f0; color: #2d6a4f; }
-.pill-blue  { background: #e8f0fe; color: #2563eb; }
-
-.metric-cell { text-align: center; }
-.metric-val  { font-size: 15px; font-weight: 600; line-height: 1.1; }
-.metric-val.ok      { color: #2d6a4f; }
-.metric-val.warn    { color: #d4880a; }
-.metric-val.overdue { color: #c0392b; }
-.metric-val.na      { color: #c0c0d0; }
+.pill-red { background: #fdecea; color: #c0392b; } .pill-amber { background: #fef6e4; color: #d4880a; } .pill-teal { background: #e8f4f0; color: #2d6a4f; } .pill-blue { background: #e8f0fe; color: #2563eb; }
+.metric-cell { text-align: center; } .metric-val { font-size: 15px; font-weight: 600; line-height: 1.1; }
+.metric-val.ok { color: #2d6a4f; } .metric-val.warn { color: #d4880a; } .metric-val.overdue { color: #c0392b; } .metric-val.na { color: #c0c0d0; }
 .metric-lbl { font-size: 10px; color: #b0b0c0; font-weight: 500; margin-top: 2px; }
-
-.next-action        { font-size: 12px; color: #5a5a7a; line-height: 1.5; }
-.next-action.urgent { color: #c0392b; font-weight: 500; }
-
-.urgency-wrap  { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.next-action { font-size: 12px; color: #5a5a7a; line-height: 1.5; } .next-action.urgent { color: #c0392b; font-weight: 500; }
+.urgency-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .urgency-track { width: 100%; height: 5px; background: #f0ede8; border-radius: 3px; overflow: hidden; }
-.urgency-fill  { height: 100%; border-radius: 3px; }
-.urgency-label { font-size: 10px; color: #a0a0b0; font-weight: 500; }
-
+.urgency-fill { height: 100%; border-radius: 3px; } .urgency-label { font-size: 10px; color: #a0a0b0; font-weight: 500; }
 .profile-panel { background: #fafaf8; border: 1px solid #e8e5df; border-top: none; border-radius: 0 0 12px 12px; padding: 20px 20px 16px 20px; margin-top: -4px; margin-bottom: 4px; }
 .profile-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
 .profile-field { background: white; border-radius: 8px; padding: 10px 12px; border: 1px solid #e8e5df; }
 .profile-label { font-size: 10px; font-weight: 600; color: #a0a0b0; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 3px; }
 .profile-value { font-size: 13px; font-weight: 500; color: #1a1a2e; }
 .action-box { border-radius: 8px; padding: 12px 16px; margin-bottom: 14px; }
-.action-box.ok     { background: #e8f4f0; }
-.action-box.urgent { background: #fdecea; }
+.action-box.ok { background: #e8f4f0; } .action-box.urgent { background: #fdecea; }
 .action-box-label { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 3px; }
-.action-box-label.ok     { color: #2d6a4f; }
-.action-box-label.urgent { color: #c0392b; }
+.action-box-label.ok { color: #2d6a4f; } .action-box-label.urgent { color: #c0392b; }
 .action-box-text { font-size: 13px; font-weight: 500; color: #1a1a2e; }
 .edit-section-label { font-size: 11px; font-weight: 700; color: #a0a0b0; letter-spacing: 0.8px; text-transform: uppercase; padding-top: 12px; margin-top: 8px; border-top: 1px solid #e8e5df; margin-bottom: 10px; }
-
+.auth-wrap { max-width: 420px; margin: 80px auto; background: white; border-radius: 16px; padding: 40px; border: 1px solid #e8e5df; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+.auth-logo { text-align: center; margin-bottom: 28px; }
+.auth-title { font-family: 'DM Serif Display', serif; font-size: 26px; color: #1a1a2e; margin-bottom: 4px; }
+.auth-sub { font-size: 13px; color: #8a8a9a; }
 .stTextInput > div > div > input, .stTextArea > div > div > textarea { background: white !important; border: 1px solid #e0ddd8 !important; border-radius: 8px !important; color: #1a1a2e !important; font-size: 14px !important; padding: 10px 14px !important; }
-.stSelectbox > div > div { background: white !important; border: 1px solid #e0ddd8 !important; border-radius: 8px !important; }
 label, .stCheckbox > label > span { color: #5a5a7a !important; font-size: 13px !important; font-weight: 500 !important; }
 .stDateInput > div > div > input { background: white !important; border: 1px solid #e0ddd8 !important; border-radius: 8px !important; color: #1a1a2e !important; }
-.stButton > button { background: #2d6a4f !important; border: none !important; color: white !important; font-size: 13px !important; font-weight: 600 !important; border-radius: 8px !important; padding: 10px 22px !important; }
+.stButton > button { background: #2d6a4f !important; border: none !important; color: white !important; font-size: 13px !important; font-weight: 600 !important; border-radius: 8px !important; padding: 10px 22px !important; width: 100%; }
 .stButton > button:hover { background: #245a40 !important; }
-.toggle-btn > button { background: #f0ede8 !important; color: #5a5a7a !important; font-size: 11px !important; font-weight: 600 !important; padding: 4px 10px !important; border-radius: 6px !important; }
+.toggle-btn > button { background: #f0ede8 !important; color: #5a5a7a !important; font-size: 11px !important; font-weight: 600 !important; padding: 4px 10px !important; border-radius: 6px !important; width: auto !important; }
 .toggle-btn > button:hover { background: #e0ddd8 !important; }
-
+.signout-btn > button { background: #f0ede8 !important; color: #5a5a7a !important; font-size: 12px !important; font-weight: 600 !important; padding: 6px 14px !important; border-radius: 8px !important; width: auto !important; }
 .empty-state { text-align: center; padding: 72px 0; }
-.empty-icon  { font-size: 48px; margin-bottom: 16px; }
-.empty-text  { font-size: 16px; font-weight: 500; color: #a0a0b0; }
-.empty-sub   { font-size: 13px; margin-top: 6px; color: #c0c0d0; }
+.empty-icon { font-size: 48px; margin-bottom: 16px; }
+.empty-text { font-size: 16px; font-weight: 500; color: #a0a0b0; }
+.empty-sub { font-size: 13px; margin-top: 6px; color: #c0c0d0; }
 hr { border-color: #e8e5df !important; }
 </style>
 """, unsafe_allow_html=True)
 
-DATA_FILE = "clients.csv"
-columns = ["Client","DOB","Intake Date","Last Seen","Intake Complete","Treatment Plan Date","Discharge Ready","Notes","PHQ-9 Completed Date","GAD-7 Completed Date"]
+# ── SUPABASE ─────────────────────────────────────────────────────
+@st.cache_resource
+def get_supabase():
+    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
-if os.path.exists(DATA_FILE):
-    df = pd.read_csv(DATA_FILE)
-else:
-    df = pd.DataFrame(columns=columns)
+supabase = get_supabase()
 
-for c in columns:
-    if c not in df.columns:
-        df[c] = ""
+# ── AUTH STATE ───────────────────────────────────────────────────
+if "user" not in st.session_state:
+    st.session_state.user = None
+if "auth_mode" not in st.session_state:
+    st.session_state.auth_mode = "login"
+if "expanded" not in st.session_state:
+    st.session_state.expanded = {}
+
+# ── AUTH SCREEN ──────────────────────────────────────────────────
+if st.session_state.user is None:
+    st.markdown("""
+    <div class="auth-wrap">
+      <div class="auth-logo">
+        <div style="width:52px;height:52px;background:#2d6a4f;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px auto;">🌿</div>
+        <div class="auth-title">Omniveil</div>
+        <div class="auth-sub">Caseload Intelligence</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    mode = st.session_state.auth_mode
+    col1, col2, col3 = st.columns([1,2,1])
+    with col2:
+        tab_login, tab_signup = st.tabs(["  Sign In  ", "  Create Account  "])
+
+        with tab_login:
+            with st.form("login_form"):
+                email    = st.text_input("Email", key="login_email")
+                password = st.text_input("Password", type="password", key="login_password")
+                submit   = st.form_submit_button("Sign In")
+                if submit:
+                    try:
+                        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                        st.session_state.user = res.user
+                        st.rerun()
+                    except Exception as e:
+                        st.error("Invalid email or password.")
+
+        with tab_signup:
+            with st.form("signup_form"):
+                email    = st.text_input("Email", key="signup_email")
+                password = st.text_input("Password (min 6 characters)", type="password", key="signup_password")
+                submit   = st.form_submit_button("Create Account")
+                if submit:
+                    try:
+                        res = supabase.auth.sign_up({"email": email, "password": password})
+                        if res.user:
+                            st.session_state.user = res.user
+                            st.rerun()
+                        else:
+                            st.error("Something went wrong. Try again.")
+                    except Exception as e:
+                        st.error(f"Error: {str(e)}")
+    st.stop()
+
+# ── LOGGED IN — get user id ───────────────────────────────────────
+user_id = st.session_state.user.id
+user_email = st.session_state.user.email
+
+# ── DATA FUNCTIONS ───────────────────────────────────────────────
+def load_clients():
+    res = supabase.table("clients").select("*").eq("user_id", user_id).execute()
+    rows = res.data or []
+    if not rows:
+        return pd.DataFrame(columns=["id","Client","DOB","Intake Date","Last Seen","Intake Complete","Treatment Plan Date","Discharge Ready","Notes","PHQ-9 Completed Date","GAD-7 Completed Date"])
+    df = pd.DataFrame(rows)
+    rename = {
+        "client_name":"Client","dob":"DOB","intake_date":"Intake Date",
+        "last_seen":"Last Seen","intake_complete":"Intake Complete",
+        "treatment_plan_date":"Treatment Plan Date","discharge_ready":"Discharge Ready",
+        "notes":"Notes","phq9_completed_date":"PHQ-9 Completed Date",
+        "gad7_completed_date":"GAD-7 Completed Date"
+    }
+    df = df.rename(columns=rename)
+    for col in ["DOB","Intake Date","Last Seen","Treatment Plan Date","PHQ-9 Completed Date","GAD-7 Completed Date","Notes"]:
+        if col not in df.columns: df[col] = ""
+        df[col] = df[col].fillna("").astype(str)
+    if "Discharge Ready" not in df.columns: df["Discharge Ready"] = False
+    df["Discharge Ready"] = df["Discharge Ready"].fillna(False)
+    if "Intake Complete" not in df.columns: df["Intake Complete"] = True
+    df["Intake Complete"] = df["Intake Complete"].fillna(True)
+    return df
+
+def save_client(data):
+    supabase.table("clients").insert({
+        "user_id": user_id,
+        "client_name": data["Client"],
+        "dob": data["DOB"] or None,
+        "intake_date": data["Intake Date"] or None,
+        "last_seen": data["Last Seen"] or None,
+        "intake_complete": True,
+        "treatment_plan_date": data["Treatment Plan Date"] or None,
+        "discharge_ready": data["Discharge Ready"],
+        "notes": data["Notes"] or "",
+        "phq9_completed_date": data["PHQ-9 Completed Date"] or None,
+        "gad7_completed_date": data["GAD-7 Completed Date"] or None,
+    }).execute()
+
+def update_client(row_id, data):
+    supabase.table("clients").update({
+        "client_name": data["Client"],
+        "dob": data["DOB"] or None,
+        "intake_date": data["Intake Date"] or None,
+        "last_seen": data["Last Seen"] or None,
+        "intake_complete": True,
+        "treatment_plan_date": data["Treatment Plan Date"] or None,
+        "discharge_ready": data["Discharge Ready"],
+        "notes": data["Notes"] or "",
+        "phq9_completed_date": data["PHQ-9 Completed Date"] or None,
+        "gad7_completed_date": data["GAD-7 Completed Date"] or None,
+    }).eq("id", row_id).eq("user_id", user_id).execute()
+
+def delete_client(row_id):
+    supabase.table("clients").delete().eq("id", row_id).eq("user_id", user_id).execute()
 
 def to_bool(v):
     if isinstance(v, bool): return v
     return str(v).lower() in ["true","1","yes","y"]
 
-for col in ["PHQ-9 Complete","GAD-7 Complete","PHQ-9 Due Date","GAD-7 Due Date","90-Day Complete","90-Day Due Date","Continuum Status"]:
-    if col in df.columns:
-        df = df.drop(columns=[col], errors="ignore")
-
-for col in ["DOB","Intake Date","Last Seen","Treatment Plan Date","PHQ-9 Completed Date","GAD-7 Completed Date"]:
-    if col not in df.columns:
-        df[col] = ""
-
-df["Notes"] = df["Notes"].fillna("").astype(str)
-df["DOB"] = df["DOB"].fillna("").astype(str)
-df["PHQ-9 Completed Date"] = df["PHQ-9 Completed Date"].fillna("").astype(str)
-df["GAD-7 Completed Date"] = df["GAD-7 Completed Date"].fillna("").astype(str)
-if "Discharge Ready" not in df.columns:
-    df["Discharge Ready"] = False
-df["Discharge Ready"] = df["Discharge Ready"].fillna(False).apply(to_bool)
-
-# Deduplicate on load - keep last entry for each name
-df = df.drop_duplicates(subset=["Client"], keep="last").reset_index(drop=True)
-df.to_csv(DATA_FILE, index=False)
-
 today = date.today()
 min_dob = date(today.year - 100, 1, 1)
 
 def _parse_date(d):
-    if d is None or (isinstance(d, float) and pd.isna(d)) or str(d).strip() == "":
+    if d is None or (isinstance(d, float) and pd.isna(d)) or str(d).strip() in ("","None","nan"):
         return None
     s = str(d).strip()
     for fmt in ("%Y-%m-%d", "%Y/%m/%d"):
@@ -152,13 +215,6 @@ def _parse_date(d):
         except:
             pass
     return None
-
-def _derive_intake_complete(row):
-    if _parse_date(row.get("Intake Date","")) is not None:
-        return True
-    return to_bool(row.get("Intake Complete", False))
-
-df["Intake Complete"] = df.apply(_derive_intake_complete, axis=1)
 
 def days_since(d):
     parsed = _parse_date(d)
@@ -228,19 +284,30 @@ def compute(row):
         "Next Action":next_action,"Urgency":urgency,
     })
 
-if "expanded" not in st.session_state:
-    st.session_state.expanded = {}
+df = load_clients()
+if not df.empty:
+    df["Intake Complete"] = df.apply(lambda r: True if _parse_date(r.get("Intake Date","")) else to_bool(r.get("Intake Complete", True)), axis=1)
 
 # ── HEADER ──────────────────────────────────────────────────────
-st.markdown(f"""
-<div class="top-bar">
-  <div class="brand">
-    <div class="brand-icon">🌿</div>
-    <div><div class="brand-name">Omniveil</div><div class="brand-tagline">Caseload Intelligence</div></div>
-  </div>
-  <div class="top-date">{today.strftime("%A, %B %d, %Y")}</div>
-</div>
-""", unsafe_allow_html=True)
+col_brand, col_user = st.columns([6,1])
+with col_brand:
+    st.markdown(f"""
+    <div class="top-bar">
+      <div class="brand">
+        <div class="brand-icon">🌿</div>
+        <div><div class="brand-name">Omniveil</div><div class="brand-tagline">Caseload Intelligence</div></div>
+      </div>
+      <div class="top-date">{today.strftime("%A, %B %d, %Y")} &nbsp;·&nbsp; {user_email}</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col_user:
+    st.markdown('<div class="signout-btn">', unsafe_allow_html=True)
+    if st.button("Sign Out", key="signout"):
+        supabase.auth.sign_out()
+        st.session_state.user = None
+        st.session_state.expanded = {}
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 if not df.empty:
     view = pd.concat([df, df.apply(compute, axis=1)], axis=1)
@@ -263,14 +330,11 @@ if not df.empty:
     st.markdown('<div class="table-head"><div></div><div>Client</div><div>Status</div><div style="text-align:center">Last Seen</div><div style="text-align:center">Tx Plan</div><div style="text-align:center">90-Day</div><div>Next Action</div><div style="text-align:right">Priority</div><div></div></div>', unsafe_allow_html=True)
 
     for i, (_, row) in enumerate(view.iterrows()):
-        # Use i (position in sorted view) as unique key — never duplicates
         key = f"row_{i}"
         s   = row["Continuum Status"]
         u   = row["Urgency"]
         client_name = row["Client"]
-        # Find original df index for saving
-        matches = df[df["Client"]==client_name]
-        idx = matches.index[0] if len(matches) > 0 else None
+        row_id = row.get("id")
 
         if u >= 85:   rank_cls = "critical"
         elif u >= 65: rank_cls = "warning"
@@ -307,42 +371,40 @@ if not df.empty:
         notes_v    = str(row.get("Notes") or "").strip()
         is_open    = st.session_state.expanded.get(key, False)
 
-        row_cols = st.columns([36, 220, 150, 90, 90, 90, 200, 90, 44])
-        with row_cols[0]:
+        cols = st.columns([36, 220, 150, 90, 90, 90, 200, 90, 44])
+        with cols[0]:
             st.markdown(f'<div class="rank-num {rank_cls}" style="margin-top:6px;">{i+1}</div>', unsafe_allow_html=True)
-        with row_cols[1]:
+        with cols[1]:
             st.markdown(f'<div class="client-name">{client_name}</div><div class="client-sub">DOB: {dob_v} · Intake: {intake_v}</div>', unsafe_allow_html=True)
-        with row_cols[2]:
+        with cols[2]:
             st.markdown(f'<span class="pill {pill_cls}">{s}</span>', unsafe_allow_html=True)
-        with row_cols[3]:
+        with cols[3]:
             st.markdown(f'<div class="metric-cell"><div class="metric-val {seen_cls}">{seen_val}</div><div class="metric-lbl">Last Seen</div></div>', unsafe_allow_html=True)
-        with row_cols[4]:
+        with cols[4]:
             st.markdown(f'<div class="metric-cell"><div class="metric-val {tp_cls}">{tp_val}</div><div class="metric-lbl">Tx Plan Age</div></div>', unsafe_allow_html=True)
-        with row_cols[5]:
+        with cols[5]:
             st.markdown(f'<div class="metric-cell"><div class="metric-val {pct_cls}">{pct}%</div><div class="metric-lbl">90-Day</div></div>', unsafe_allow_html=True)
-        with row_cols[6]:
+        with cols[6]:
             st.markdown(f'<div class="next-action {action_cls}">{next_act}</div>', unsafe_allow_html=True)
-        with row_cols[7]:
+        with cols[7]:
             st.markdown(f'<div class="urgency-wrap"><div class="urgency-label">{u}/100</div><div class="urgency-track"><div class="urgency-fill" style="width:{u}%;background:{bar_color};"></div></div></div>', unsafe_allow_html=True)
-        with row_cols[8]:
-            btn_label = "▲" if is_open else "▼"
+        with cols[8]:
             st.markdown('<div class="toggle-btn">', unsafe_allow_html=True)
-            if st.button(btn_label, key=f"btn_{key}"):
+            if st.button("▲" if is_open else "▼", key=f"btn_{key}"):
                 st.session_state.expanded[key] = not is_open
                 st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('<div style="height:2px;"></div>', unsafe_allow_html=True)
 
-        if is_open and idx is not None:
-            action_box_cls   = "urgent" if rank_cls=="critical" else "ok"
-            action_label_cls = "urgent" if rank_cls=="critical" else "ok"
+        if is_open:
+            action_box_cls = "urgent" if rank_cls=="critical" else "ok"
             notes_block = f'<div style="background:white;border:1px solid #e8e5df;border-radius:8px;padding:10px 12px;margin-bottom:14px;"><div class="profile-label">Notes</div><div style="font-size:13px;color:#5a5a7a;margin-top:3px;">{notes_v}</div></div>' if notes_v else ""
 
             st.markdown(f"""
             <div class="profile-panel">
               <div class="action-box {action_box_cls}">
-                <div class="action-box-label {action_label_cls}">Recommended Next Action</div>
+                <div class="action-box-label {action_box_cls}">Recommended Next Action</div>
                 <div class="action-box-text">{next_act}</div>
               </div>
               <div class="profile-grid">
@@ -369,27 +431,30 @@ if not df.empty:
                     edit_seen   = st.date_input("Last Seen", value=_parse_date(row.get("Last Seen","")) or today, key=f"seen_{key}")
                     edit_tp     = st.date_input("Treatment Plan Date", value=_parse_date(row.get("Treatment Plan Date","")) or today, key=f"tp_{key}")
                 with c2:
-                    edit_phq9   = st.date_input("PHQ-9 Completed On", value=_parse_date(row.get("PHQ-9 Completed Date","")), key=f"phq9_{key}")
-                    edit_gad7   = st.date_input("GAD-7 Completed On", value=_parse_date(row.get("GAD-7 Completed Date","")), key=f"gad7_{key}")
-                    edit_dc     = st.checkbox("Discharge Ready", value=to_bool(row.get("Discharge Ready",False)), key=f"dc_{key}")
-                    edit_notes  = st.text_area("Notes", value=notes_v, height=80, key=f"notes_{key}")
+                    edit_phq9  = st.date_input("PHQ-9 Completed On", value=_parse_date(row.get("PHQ-9 Completed Date","")), key=f"phq9_{key}")
+                    edit_gad7  = st.date_input("GAD-7 Completed On", value=_parse_date(row.get("GAD-7 Completed Date","")), key=f"gad7_{key}")
+                    edit_dc    = st.checkbox("Discharge Ready", value=to_bool(row.get("Discharge Ready",False)), key=f"dc_{key}")
+                    edit_notes = st.text_area("Notes", value=notes_v, height=80, key=f"notes_{key}")
                 col1, col2 = st.columns([2,1])
                 with col1: save_btn   = st.form_submit_button("💾 Save Changes")
                 with col2: remove_btn = st.form_submit_button("🗑 Remove Client")
+
+                def edate(d): return d.strftime("%Y-%m-%d") if d else ""
+
                 if save_btn:
-                    def edate(d): return d.strftime("%Y-%m-%d") if d else ""
-                    df.at[idx,"Client"]=edit_name; df.at[idx,"DOB"]=edate(edit_dob)
-                    df.at[idx,"Intake Date"]=edate(edit_intake); df.at[idx,"Last Seen"]=edit_seen.strftime("%Y-%m-%d")
-                    df.at[idx,"Intake Complete"]=True; df.at[idx,"Treatment Plan Date"]=edit_tp.strftime("%Y-%m-%d")
-                    df.at[idx,"Discharge Ready"]=edit_dc; df.at[idx,"Notes"]=edit_notes or ""
-                    df.at[idx,"PHQ-9 Completed Date"]=edate(edit_phq9); df.at[idx,"GAD-7 Completed Date"]=edate(edit_gad7)
-                    df.to_csv(DATA_FILE, index=False)
+                    update_client(row_id, {
+                        "Client": edit_name, "DOB": edate(edit_dob),
+                        "Intake Date": edate(edit_intake), "Last Seen": edit_seen.strftime("%Y-%m-%d"),
+                        "Treatment Plan Date": edit_tp.strftime("%Y-%m-%d"),
+                        "Discharge Ready": edit_dc, "Notes": edit_notes or "",
+                        "PHQ-9 Completed Date": edate(edit_phq9), "GAD-7 Completed Date": edate(edit_gad7),
+                    })
                     st.session_state.expanded[key] = False
                     st.toast(f"✓ {edit_name} updated", icon="💾")
                     st.rerun()
+
                 if remove_btn:
-                    df = df.drop(index=idx).reset_index(drop=True)
-                    df.to_csv(DATA_FILE, index=False)
+                    delete_client(row_id)
                     st.session_state.expanded.pop(key, None)
                     st.toast(f"✓ {client_name} removed", icon="🗑")
                     st.rerun()
@@ -416,21 +481,20 @@ with st.expander("➕  Add a new client"):
             notes          = st.text_area("Notes (optional)", height=80, key="notes_new")
         submitted = st.form_submit_button("Add Client")
         if submitted:
+            def dstr(d): return d.strftime("%Y-%m-%d") if d else ""
             if not name.strip():
                 st.error("Client name is required.")
             elif name.strip() in df["Client"].astype(str).tolist():
                 st.error(f"'{name.strip()}' already exists.")
             else:
-                def dstr(d): return d.strftime("%Y-%m-%d") if d else ""
-                df = pd.concat([df, pd.DataFrame([{
-                    "Client":name.strip(), "DOB":dstr(dob),
-                    "Intake Date":dstr(intake_date), "Last Seen":last_seen.strftime("%Y-%m-%d"),
-                    "Intake Complete":True, "Treatment Plan Date":tp.strftime("%Y-%m-%d"),
-                    "Discharge Ready":discharge_ready, "Notes":notes or "",
-                    "PHQ-9 Completed Date":dstr(phq9_completed), "GAD-7 Completed Date":dstr(gad7_completed),
-                }])], ignore_index=True)
-                df.to_csv(DATA_FILE, index=False)
+                save_client({
+                    "Client": name.strip(), "DOB": dstr(dob),
+                    "Intake Date": dstr(intake_date), "Last Seen": last_seen.strftime("%Y-%m-%d"),
+                    "Treatment Plan Date": tp.strftime("%Y-%m-%d"),
+                    "Discharge Ready": discharge_ready, "Notes": notes or "",
+                    "PHQ-9 Completed Date": dstr(phq9_completed), "GAD-7 Completed Date": dstr(gad7_completed),
+                })
                 st.toast(f"✓ {name.strip()} added to caseload", icon="✅")
                 st.rerun()
 
-st.markdown('<div style="margin-top:48px;padding-top:20px;border-top:1px solid #e8e5df;font-size:11px;color:#c0c0d0;text-align:center;">Omniveil · Clinical decision support tool · Not a diagnostic instrument · All client data stored locally</div>', unsafe_allow_html=True)
+st.markdown('<div style="margin-top:48px;padding-top:20px;border-top:1px solid #e8e5df;font-size:11px;color:#c0c0d0;text-align:center;">Omniveil · Clinical decision support tool · Not a diagnostic instrument</div>', unsafe_allow_html=True)
